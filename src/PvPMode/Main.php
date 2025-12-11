@@ -18,7 +18,6 @@ use pocketmine\scheduler\Task;
 
 class Main extends PluginBase implements Listener {
 
-    private Config $config;
     private Config $arenas;
     private array $duels = [];
     private array $requests = [];
@@ -31,11 +30,6 @@ class Main extends PluginBase implements Listener {
         $this->getServer()->getPluginManager()->registerEvents($this, $this);
         
         @mkdir($this->getDataFolder());
-        $this->config = new Config($this->getDataFolder() . "config.yml", Config::YAML, [
-            "request-expire-seconds" => 60,
-            "countdown-seconds" => 5,
-            "respawn-on-death" => true
-        ]);
         $this->arenas = new Config($this->getDataFolder() . "arenas.yml", Config::YAML);
         
         $this->loadArenas();
@@ -137,19 +131,7 @@ class Main extends PluginBase implements Listener {
         $target->sendMessage(TF::GRAY . "Request expires in 60 seconds");
         $target->sendMessage(TF::GOLD . "━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-        $this->getScheduler()->scheduleDelayedTask(new class($this, $target->getName()) extends Task {
-            private Main $plugin;
-            private string $targetName;
-
-            public function __construct(Main $plugin, string $targetName) {
-                $this->plugin = $plugin;
-                $this->targetName = $targetName;
-            }
-
-            public function onRun(): void {
-                $this->plugin->expireRequest($this->targetName);
-            }
-        }, 20 * 60);
+        $this->getScheduler()->scheduleDelayedTask(new RequestExpireTask($this, $target->getName()), 20 * 60);
 
         return true;
     }
@@ -328,14 +310,16 @@ class Main extends PluginBase implements Listener {
         }
 
         $stats = $this->stats[$targetName];
-        $total = $stats["wins"] + $stats["losses"];
-        $winrate = $total > 0 ? round(($stats["wins"] / $total) * 100, 1) : 0;
+        $wins = isset($stats["wins"]) ? (int)$stats["wins"] : 0;
+        $losses = isset($stats["losses"]) ? (int)$stats["losses"] : 0;
+        $total = $wins + $losses;
+        $winrate = $total > 0 ? round(($wins / $total) * 100, 1) : 0;
 
         $sender->sendMessage(TF::GOLD . "━━━━━━━ " . $targetName . "'s Stats ━━━━━━━");
-        $sender->sendMessage(TF::YELLOW . "Wins: " . TF::GREEN . $stats["wins"]);
-        $sender->sendMessage(TF::YELLOW . "Losses: " . TF::RED . $stats["losses"]);
+        $sender->sendMessage(TF::YELLOW . "Wins: " . TF::GREEN . $wins);
+        $sender->sendMessage(TF::YELLOW . "Losses: " . TF::RED . $losses);
         $sender->sendMessage(TF::YELLOW . "Win Rate: " . TF::AQUA . $winrate . "%");
-        $sender->sendMessage(TF::YELLOW . "Win Streak: " . TF::GOLD . $stats["streak"]);
+        $sender->sendMessage(TF::YELLOW . "Win Streak: " . TF::GOLD . (isset($stats["streak"]) ? $stats["streak"] : 0));
         $sender->sendMessage(TF::GOLD . "━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         return true;
@@ -398,22 +382,7 @@ class Main extends PluginBase implements Listener {
         $player2->sendMessage(TF::YELLOW . "Opponent: " . $player1->getName());
         $player2->sendMessage(TF::GOLD . "━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-        $this->getScheduler()->scheduleDelayedTask(new class($this, $player1, $player2) extends Task {
-            private Main $plugin;
-            private Player $p1;
-            private Player $p2;
-
-            public function __construct(Main $plugin, Player $p1, Player $p2) {
-                $this->plugin = $plugin;
-                $this->p1 = $p1;
-                $this->p2 = $p2;
-            }
-
-            public function onRun(): void {
-                $this->p1->sendMessage(TF::GREEN . "FIGHT!");
-                $this->p2->sendMessage(TF::GREEN . "FIGHT!");
-            }
-        }, 20 * 5);
+        $this->getScheduler()->scheduleDelayedTask(new DuelStartTask($this, $player1, $player2), 20 * 5);
     }
 
     private function giveKit(Player $player): void {
@@ -614,5 +583,34 @@ class Main extends PluginBase implements Listener {
 
     protected function onDisable(): void {
         $this->saveArenas();
+    }
+}
+
+class RequestExpireTask extends Task {
+    private Main $plugin;
+    private string $targetName;
+
+    public function __construct(Main $plugin, string $targetName) {
+        $this->plugin = $plugin;
+        $this->targetName = $targetName;
+    }
+
+    public function onRun(): void {
+        $this->plugin->expireRequest($this->targetName);
+    }
+}
+
+class DuelStartTask extends Task {
+    private Player $p1;
+    private Player $p2;
+
+    public function __construct(Main $plugin, Player $p1, Player $p2) {
+        $this->p1 = $p1;
+        $this->p2 = $p2;
+    }
+
+    public function onRun(): void {
+        $this->p1->sendMessage(TF::GREEN . "FIGHT!");
+        $this->p2->sendMessage(TF::GREEN . "FIGHT!");
     }
 }
