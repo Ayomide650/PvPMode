@@ -1,0 +1,23 @@
+name: PvPMode
+version: 1.0.0
+main: PvPMode\Main
+api: 5.0.0
+author: Firekid846
+description: 1v1 PvP duel system with stats and rankings
+
+commands:
+  pvp:
+    description: PvP duel system
+    usage: "/pvp <ask|accept|reject|forfeit|stats|top|kit|set>"
+    permission: pvpmode.use
+
+permissions:
+  pvpmode.use:
+    description: Allows using PvP commands
+    default: true
+  pvpmode.admin:
+    description: Allows admin commands
+    default: op
+  pvpmode.kit:
+    description: Allows setting kit
+    default: op
