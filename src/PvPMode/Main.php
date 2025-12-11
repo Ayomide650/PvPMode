@@ -25,12 +25,19 @@ class Main extends PluginBase implements Listener {
     private ?Position $spawn1 = null;
     private ?Position $spawn2 = null;
     private array $stats = [];
+    private ?object $rankPlugin = null;
 
     protected function onEnable(): void {
         $this->getServer()->getPluginManager()->registerEvents($this, $this);
         
         @mkdir($this->getDataFolder());
         $this->arenas = new Config($this->getDataFolder() . "arenas.yml", Config::YAML);
+        
+        $rankPlugin = $this->getServer()->getPluginManager()->getPlugin("RankPro");
+        if ($rankPlugin !== null && $rankPlugin->isEnabled()) {
+            $this->rankPlugin = $rankPlugin;
+            $this->getLogger()->info(TF::GREEN . "Hooked into RankPro for XP rewards!");
+        }
         
         $this->loadArenas();
         
@@ -382,7 +389,7 @@ class Main extends PluginBase implements Listener {
         $player2->sendMessage(TF::YELLOW . "Opponent: " . $player1->getName());
         $player2->sendMessage(TF::GOLD . "━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-        $this->getScheduler()->scheduleDelayedTask(new DuelStartTask($this, $player1, $player2), 20 * 5);
+        $this->getScheduler()->scheduleDelayedTask(new DuelStartTask($player1, $player2), 20 * 5);
     }
 
     private function giveKit(Player $player): void {
@@ -458,6 +465,11 @@ class Main extends PluginBase implements Listener {
 
         $this->stats[$loser]["losses"]++;
         $this->stats[$loser]["streak"] = 0;
+
+        if ($this->rankPlugin !== null) {
+            $this->rankPlugin->addPvPWin($winner);
+            $this->rankPlugin->resetPvPStreak($loser);
+        }
 
         $winnerPlayer = $this->getServer()->getPlayerExact($winner);
         $loserPlayer = $this->getServer()->getPlayerExact($loser);
@@ -604,7 +616,7 @@ class DuelStartTask extends Task {
     private Player $p1;
     private Player $p2;
 
-    public function __construct(Main $plugin, Player $p1, Player $p2) {
+    public function __construct(Player $p1, Player $p2) {
         $this->p1 = $p1;
         $this->p2 = $p2;
     }
